@@ -56,10 +56,10 @@ def rename_locals(data)
   }
 end
 
-def glsl_min_source(source)
+def glsl_min_source(oldsource)
   source = ""
   
-  get_chunks(source).each { |chunk|
+  get_chunks(oldsource).each { |chunk|
     data = chunk["data"]
     
     if chunk["type"] == "dontcare"
