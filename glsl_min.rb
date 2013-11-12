@@ -97,5 +97,5 @@ def glsl_min_source(source)
 end
 
 def glsl_min_file(path)
-  glsl_min_source(IO.read(path))
+  return glsl_min_source(IO.read(path))
 end
