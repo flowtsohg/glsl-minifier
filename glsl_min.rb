@@ -56,10 +56,10 @@ def rename_locals(data)
   }
 end
 
-def shader_min(path)
+def glsl_min_source(source)
   source = ""
   
-  get_chunks(IO.read(path)).each { |chunk|
+  get_chunks(source).each { |chunk|
     data = chunk["data"]
     
     if chunk["type"] == "dontcare"
@@ -94,4 +94,8 @@ def shader_min(path)
   newsource = newsource.gsub("\n\n", "\n").gsub("\n", "\\n")
   
   return newsource
+end
+
+def glsl_min_file(path)
+  glsl_min_source(IO.read(path))
 end
