@@ -42,17 +42,20 @@ def get_chunks(source)
 end
 
 def rename_locals(data)
-  newnames = [*("a".."z"), *("A".."Z")]
+  newnames = [*("A".."Z"), *("a".."z")]
   
-  data["arguments"].scan(/\w+\s+(\w+)/).each { |argument|
+  data["arguments"].scan(/(in\s+|out\s+)?\w+\s+(\w+)/).each { |argument|
     newname = newnames.shift()
+    namereg = /\b#{argument[1]}\b/
     
-    data["arguments"] = data["arguments"].gsub(/\b#{argument[0]}\b/, newname)
-    data["body"] = data["body"].gsub(/\b#{argument[0]}\b/, newname)
+    data["arguments"] = data["arguments"].sub(namereg, newname)
+    data["body"] = data["body"].gsub(namereg, newname)
   }
   
-  data["body"].scan(/(bool|bvec2|bvec3|bvec4|int|ivec2|ivec3|ivec4|uint|uvec2|uvec3|uvec4|float|vec2|vec3|vec4|double|dvec2|dvec3|dvec4|mat2|mat2x2|mat2x3|mat2x4|mat3|mat3x2|mat3x3|mat3x4|mat4|mat4x2|mat4x3|mat4x4) (\w+)/).each { |local|
-    data["body"] = data["body"].gsub(/\b#{local[1]}\b/, newnames.shift())
+  data["body"].scan(/(bool|bvec2|bvec3|bvec4|int|ivec2|ivec3|ivec4|uint|uvec2|uvec3|uvec4|float|vec2|vec3|vec4|double|dvec2|dvec3|dvec4|mat2|mat2x2|mat2x3|mat2x4|mat3|mat3x2|mat3x3|mat3x4|mat4|mat4x2|mat4x3|mat4x4) (.*?);/m).each { |locals|
+    locals[1].split("=")[0].split(",").each { |local|
+      data["body"] = data["body"].gsub(/\b#{local.strip()}\b/, newnames.shift())
+    }
   }
 end
 
@@ -91,9 +94,7 @@ def glsl_min_source(oldsource)
     end
   }
   
-  newsource = newsource.gsub("\n\n", "\n").gsub("\n", "\\n")
-  
-  return newsource
+  return newsource.gsub("\n\n", "\n").gsub("\n", "\\n")
 end
 
 def glsl_min_file(path)
