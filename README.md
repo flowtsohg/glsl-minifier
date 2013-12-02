@@ -12,4 +12,4 @@ That is, the same new names will be given for functions/varyings/structs across 
 This is useful for when there is shared code between shaders that is kept separately, yet other minifiers would delete it because it is unused.
 
 Usage:
-  minify(["file1", "file2", ...])
+  `minify(["file1", "file2", ...])`
