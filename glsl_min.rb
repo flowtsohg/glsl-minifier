@@ -1,28 +1,20 @@
 # Copyright (c) 2013 Chananya Freiman (aka GhostWolf)
 
-# Splits the source into chunks of arbitrary data, and functions
-def get_chunks(source, data_types)
-  chunks = []
-  fn = source.index(/(#{data_types})\s+\w+\s*\(/, 0)
-  lastfn = 0
+# Split the source into function/other chunks
+def parse_chunks(source, data_types)
+  pass = source.split(/((?:#{data_types})\s+\w+\s*\(.*?\))/)
+  chunks = [[pass[0]]]
   
-  if not fn
-    chunks.push(["dontcare", source])
-  end
-  
-  while fn do
-    if fn - lastfn > 0
-      chunks.push(["dontcare", source[lastfn..fn-1]])
-    end
-  
-    level = 1
-    start = source.index("{", fn)
+  (1...pass.size).step(2) { |i|
+    head = pass[i].split(/\(/)
+    body_with_extra = pass[i + 1]
     
-    match = source.match(/(#{data_types})\s+(\w+)\s*(\(.*?\))/, fn);
+    start = body_with_extra.index("{")
     index = start + 1
+    level = 1
     
-    while level > 0 and index < source.length do
-      char = source[index]
+    while level > 0 and index < body_with_extra.length do
+      char = body_with_extra[index]
       
       if char == "}"
         level -= 1
@@ -33,32 +25,50 @@ def get_chunks(source, data_types)
       index += 1
     end
     
-    chunks.push(["function", {"returntype" => match[1], "name" => match[2], "arguments" => match[3], "body" => source[start..index-1]}])
+    body = body_with_extra[0...index]
+    extra = body_with_extra[index..body_with_extra.size]
     
-    fn = source.index(/#{data_types}\s+\w+\s*\(/, index)
-    lastfn = index
-  end
+    chunks += [[head[0], "(" + head[1], body], [extra]]
+  }
   
   return chunks
 end
 
 # Rename function arguments and local variables.
-# TODO: it bugs if there are already variables that are one letter long
 def rename_function_locals(data, data_types)
-  names = [*("A".."Z"), *("a".."z")]
+  names = [*("a".."z"), *("aa".."zz")]
+  arguments = []
+  locals = []
   
-  data["arguments"].scan(/(in\s+|out\s+)?\w+\s+(\w+)/).each { |argument|
-    name = names.shift()
-    namereg = /\b#{argument[1]}\b/
-    
-    data["arguments"].sub!(namereg, name)
-    data["body"].gsub!(namereg, name)
+  # Grab all the argument names
+  data[1].scan(/(?:in\s+|out\s+)?(?:#{data_types})\s+(\w+)/).each { |argument|
+    arguments += argument
   }
   
-  data["body"].scan(/(#{data_types}) (.*?);/m).each { |locals|
-    locals[1].split("=")[0].split(",").each { |local|
-      data["body"].gsub!(/\b#{local.strip()}\b/, names.shift())
+  # Short names must always come before longer names
+  arguments.sort!()
+  
+  data[2].scan(/(#{data_types}) (.*?);/m).each { |local_list|
+    local_list[1].split("=")[0].split(",").each { |local|
+      locals += [local.strip()]
     }
+  }
+  
+  # Short names must always come before longer names
+  locals.sort!()
+  
+  # Rename function arguments
+  arguments.each { |argument|
+    name = names.shift()
+    reg = /\b#{argument}\b/
+    
+    data[1].sub!(reg, name)
+    data[2].gsub!(reg, name)
+  }
+  
+  # Rename function locals
+  locals.each { |local|
+    data[2].gsub!(/\b#{local.strip()}\b/, names.shift())
   }
 end
 
@@ -88,17 +98,12 @@ end
 
 # Renames function arguments and local variables of all functions
 def rename_locals(oldsource, data_types)
-   source = ""
+  source = ""
   
-  get_chunks(oldsource, data_types).each { |chunk|
-    data = chunk[1]
+  parse_chunks(oldsource, data_types).each_with_index { |chunk, i|
+    rename_function_locals(chunk, data_types) if i % 2 != 0
     
-    if chunk[0] == "dontcare"
-      source += data
-    else
-      rename_function_locals(data, data_types)
-      source += "#{data["returntype"]} #{data["name"]}#{data["arguments"]}#{data["body"]}"
-    end
+    source += chunk.join("")
   }
   
   return source
@@ -135,8 +140,8 @@ end
 # Minify shaders given in an array
 def minify(paths)
   shaders = paths.map { |path| IO.read(path) }
-  names = [*("AA".."ZZ")]
-  data_types = ["void", "bool", "bvec2", "bvec3", "bvec4", "int", "ivec2", "ivec3", "ivec4", "uint", "uvec2", "uvec3", "uvec4", "float", "vec2", "vec3", "vec4", "double", "dvec2", "dvec3", "dvec4", "mat2", "mat2x2", "mat2x3", "mat2x4", "mat3", "mat3x2", "mat3x3", "mat3x4", "mat4", "mat4x2", "mat4x3", "mat4x4"]
+  names = [*("A".."Z"), *("AA".."ZZ")]
+  data_types = ["void", "bool", "bvec2", "bvec3", "bvec4", "int", "ivec2", "ivec3", "ivec4", "uint", "uvec2", "uvec3", "uvec4", "float", "vec2", "vec3", "vec4", "double", "dvec2", "dvec3", "dvec4", "mat2", "mat2x2", "mat2x3", "mat2x4", "mat3", "mat3x2", "mat3x3", "mat3x4", "mat4", "mat4x2", "mat4x3", "mat4x4", "sampler2D"]
   user_data_types = []
   defines = []
   functions = []
@@ -166,9 +171,19 @@ def minify(paths)
     [function, names.shift()]
   }
   
+  # Short names must always come before longer names
+  function_map.sort! { |a, b|
+    a[0] <=> b[0]
+  }
+  
   # Select new short names for all user defined types
   user_data_type_map = user_data_types.uniq().map { |data_type|
     [data_type, names.shift()]
+  }
+  
+  # Short names must always come before longer names
+  user_data_type_map.sort! { |a, b|
+    a[0] <=> b[0]
   }
   
   # Select new short names for all varyings
@@ -176,13 +191,21 @@ def minify(paths)
     [varying, names.shift()]
   }
   
+  # Short names must always come before longer names
+  varyings_map.sort! { |a, b|
+    a[0] <=> b[0]
+  }
+  
   shaders.map { |shader|
     # Rewrite function names
     function_map.each { |function|
       if function[0] != "main"
-      shader.gsub!(/\b#{function[0]}\b/, function[1])
+        shader.gsub!(/\b#{function[0]}\b/, function[1])
       end
     }
+    
+    # Rename function arguments and local variables
+    shader = rename_locals(shader, data_types_string)
     
     # Rewrite user defined type names
     user_data_type_map.each { |data_type|
@@ -202,7 +225,7 @@ def minify(paths)
       shader.gsub!(/\b#{define[0]}\b/, define[1])
     }
     
-    # Rename local variables, function arguments, and remove whitespace
-    remove_whitespace(rename_locals(shader, data_types_string))
+    # Remove whitespace
+    remove_whitespace(shader)
   }
 end
