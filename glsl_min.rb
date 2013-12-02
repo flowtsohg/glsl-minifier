@@ -141,7 +141,7 @@ end
 def minify(paths)
   shaders = paths.map { |path| IO.read(path) }
   names = [*("A".."Z"), *("AA".."ZZ")]
-  data_types = ["void", "bool", "bvec2", "bvec3", "bvec4", "int", "ivec2", "ivec3", "ivec4", "uint", "uvec2", "uvec3", "uvec4", "float", "vec2", "vec3", "vec4", "double", "dvec2", "dvec3", "dvec4", "mat2", "mat2x2", "mat2x3", "mat2x4", "mat3", "mat3x2", "mat3x3", "mat3x4", "mat4", "mat4x2", "mat4x3", "mat4x4", "sampler2D"]
+  data_types = ["void", "bool", "bvec[2-4]", "int", "ivec[2-4]", "uint", "uvec[2-4]", "float", "vec[2-4]", "double", "dvec[2-4]", "mat[2-4]", "mat[2-4]x[2-4]", "sampler[1-3]D", "samplerCube", "sampler2DRect", "sampler[1-2]DArray", "samplerCubeArray", "samplerBuffer", "sampler2DMS", "sampler2DMSArray", "sampler[1-2]DShadow", "samplerCubeShadow", "sampler2DRectShadow", "sampler[1-2]DArrayShadow", "samplerCubeArrayShadow", "image[1-3]D", "imageCube", "image2DRect", "image[1-2]DArray", "imageCubeArray", "imageBuffer", "image2DMS", "image2DMSArray"]
   user_data_types = []
   defines = []
   functions = []
@@ -156,13 +156,9 @@ def minify(paths)
   # Create a regex of all the known data types
   data_types_string = data_types.concat(user_data_types).join("|")
   
-  # Get all function names
+  # Get all function and varying names
   shaders.each { |shader|
     functions += get_function_names(shader, data_types_string)
-  }
-  
-  # Get all varying names
-  shaders.each { |shader|
     varyings += get_varying_names(shader, data_types_string)
   }
   
