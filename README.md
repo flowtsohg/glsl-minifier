@@ -4,7 +4,8 @@ glsl-minifier
 A simple GLSL minifier.
 
 It removes unneeded whitespace, renames function names, argument names, local variable names, varying variable names, and struct names.
-#defines are inlined and removed from the source.
+
+Defines are inlined and removed from the source.
 
 It works on a list of files in order to make the same changes on all of them and keep them working.
 That is, the same new names will be given for functions/varyings/structs across all inputs.
