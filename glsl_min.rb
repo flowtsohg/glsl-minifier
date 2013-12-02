@@ -141,7 +141,7 @@ end
 def minify(paths)
   shaders = paths.map { |path| IO.read(path) }
   names = [*("A".."Z"), *("AA".."ZZ")]
-  data_types = ["void", "bool", "bvec[2-4]", "int", "ivec[2-4]", "uint", "uvec[2-4]", "float", "vec[2-4]", "double", "dvec[2-4]", "mat[2-4]", "mat[2-4]x[2-4]", "sampler[1-3]D", "samplerCube", "sampler2DRect", "sampler[1-2]DArray", "samplerCubeArray", "samplerBuffer", "sampler2DMS", "sampler2DMSArray", "sampler[1-2]DShadow", "samplerCubeShadow", "sampler2DRectShadow", "sampler[1-2]DArrayShadow", "samplerCubeArrayShadow", "image[1-3]D", "imageCube", "image2DRect", "image[1-2]DArray", "imageCubeArray", "imageBuffer", "image2DMS", "image2DMSArray"]
+  data_types = ["void", "bool", "u?int", "float", "double", "(?:b|i|u|d)?vec[2-4]", "mat[2-4](?:x[2-4])?", "sampler[1-3]D", "samplerCube(?:Array)?", "sampler2DRect", "sampler[1-2]DArray", "samplerBuffer", "sampler2DMS(?:Array)?", "sampler[1-2]DShadow", "samplerCubeShadow", "sampler2DRectShadow", "sampler[1-2]DArrayShadow", "samplerCubeArrayShadow", "image[1-3]D", "imageCube(?:Array)?", "image2DRect", "image[1-2]DArray", "imageBuffer", "image2DMS(?:Array)?"]
   user_data_types = []
   defines = []
   functions = []
