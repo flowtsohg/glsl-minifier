@@ -260,7 +260,6 @@ def group_globals(data, datatypes)
   source += group_list(outer.scan(/varying\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/), "varying")
   
   data.split(/(#if.*?#endif)/m).each { |chunk|
-  p chunk
     if chunk.start_with?("#")
       tokens = chunk.split(/(.*?\n)(.*?)(#endif)/m)
       
