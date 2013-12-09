@@ -7,6 +7,7 @@ Features:
 * Removes unneeded whitespace.
 * Renames struct/function/function argument/function local variables/varying variable names.
 * Optionally renames uniform variables, attribute variables, and struct members.
+* Removes useless zeroes from numbers, converts hexadecimal numbers to decimal numbers, and changes decimal numbers to exponent representation if it's shorter.
 * Inlines #defines
 * Merges uniform/attribute/varying declarations to list declarations where possible.
 
