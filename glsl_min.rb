@@ -1,5 +1,28 @@
 # Copyright (c) 2013 Chananya Freiman (aka GhostWolf)
 
+def rewrite_numbers(data)
+  # Convert hexadecimal numbers to decimal numbers
+  data.gsub!(/0x[0-9a-fA-F]+/) { |n|
+    n.to_i(16)
+  }
+  
+  # Remove useless zeroes
+  data.gsub!(/[0]+(\.\d+)/, "\\1")
+  data.gsub!(/(\d+\.)[0]+/, "\\1")
+  
+  # Change integers to exponent representation if it's shorter
+  data.gsub!(/(\d+?)(0+)/) {
+    n = $1
+    e = $2
+    
+    if e.size > 2
+      "#{n}e#{(e.size - 1)}"
+    else
+      n + e
+    end
+  }
+end
+
 # Removes comments
 def remove_comments(source)
   source.gsub!(/\/\/.*/, "")
@@ -127,7 +150,7 @@ def remove_whitespace(oldsource)
       source += line + "\n"
       need_newline = false
     else
-      source += line.sub("\n", "").gsub(/\s*({|}|=|\*|,|\+|\/|>|<|&|\||\[|\]|\(|\)|\-|!|;)\s*/, "\\1").gsub(/0(\.\d+)/, "\\1").gsub(/(\d+\.)[0]+/, "\\1")
+      source += line.sub("\n", "").gsub(/\s*({|}|=|\*|,|\+|\/|>|<|&|\||\[|\]|\(|\)|\-|!|;)\s*/, "\\1")
       need_newline = true
     end
   }
@@ -371,6 +394,9 @@ def minify(paths, rewriteall)
     
     # Remove whitespace
     shader = remove_whitespace(shader)
+    
+    # Rewrite numbers
+    rewrite_numbers(shader)
     
     shader
   }
