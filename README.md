@@ -7,9 +7,17 @@ Features:
 * Removes unneeded whitespace.
 * Renames struct/function/function argument/function local variables/varying variable names.
 * Optionally renames uniform variables, attribute variables, and struct members.
-* Removes useless zeroes from numbers, converts hexadecimal numbers to decimal numbers, and changes decimal numbers to exponent representation if it's shorter.
+* Removes useless zeroes from numbers, converts hexadecimal numbers to decimal numbers, and changes decimal numbers to exponent representation if it's shorter.  
+`0.1 => .1`  
+`1.0 => 1.`  
+`0x1 => 1`  
+`1000 => 1e3`
+
 * Inlines #defines
-* Merges uniform/attribute/varying declarations to list declarations where possible.
+* Merges uniform/attribute/varying declarations to list declarations where possible.  
+`uniform vec3 a;`  
+`uniform vec3 b;` => `uniform vec3 a,b,c;`  
+`uniform vec3 c;`
 
 It works on a list of files in order to make the same changes on all of them and keep them working.
 That is, the same new names will be given across all inputs.
