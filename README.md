@@ -35,3 +35,30 @@ Index 1 is a hash object that maps between uniform/attribute old/new names.
 Index 2 is a hash object that maps between struct member's old/new names.  
 
 If rewriteall is false, the two hashes returned are identity, meaning every name points to itself `"name"=>"name"`.
+
+All member name changes are synchronized across all structs.  
+That is, if struct Foo has a member called "member", and struct Bar has a member called "member", then both of them will be renamed to "a".  
+This allows to use the struct member old/new name map easily when setting uniforms.  
+For example, let's assume we have the following code:  
+
+    struct Foo {
+      float something;
+    };
+     
+    uniform Foo foo;
+    
+
+
+Now let's assume it got renamed to this:
+
+    struct A {
+      float a;
+    };
+     
+    uniform A B;
+    
+The array returned by this minify call will be the following:  
+`minified = ["struct A{float a;};uniform A B;", {"Foo"=>"A", "foo"=>"B"}, {"something"=>"a"}]`
+
+So to set the 'something' member of this uniform, we must use the uniform name:
+`minified[1]["foo"] + "." + minified[2]["something"]` => `B.a`
