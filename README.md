@@ -6,7 +6,7 @@ A GLSL minifier.
 Features:
 * Removes unneeded whitespace.
 * Renames struct/function/function argument/function local variables/varying variable names.
-* Optionally renames uniform variables, attribute variables, and struct members.
+* Optionally renames uniform variables, attribute variables, and struct members (read on to see how to access them).
 * Removes useless zeroes from numbers, converts hexadecimal numbers to decimal numbers, and changes decimal numbers to exponent representation if it's shorter.  
 `0.1 => .1`  
 `1.0 => 1.`  
@@ -60,5 +60,5 @@ Now let's assume it got renamed to this:
 The array returned by this minify call will be the following:  
 `minified = ["struct A{float a;};uniform A B;", {"Foo"=>"A", "foo"=>"B"}, {"something"=>"a"}]`
 
-So to set the 'something' member of this uniform, we must use the uniform name:
+So to set the 'something' member of this uniform, we must use the returned maps:
 `minified[1]["foo"] + "." + minified[2]["something"]` => `B.a`
