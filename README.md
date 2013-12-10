@@ -8,7 +8,7 @@ A GLSL minifier.
 
 Features:
 * Removes unneeded whitespace.
-* Renames struct/function/function argument/function local variables/varying variable names.
+* Renames structs/functions/function arguments/function local variables/varying variable/const variables.
 * Optionally renames uniform variables, attribute variables, and struct members (read on to see how to access them).
 * Removes useless zeroes from numbers, converts hexadecimal numbers to decimal numbers, and changes decimal numbers to exponent representation if it's shorter.  
 `0.10 => .1`  
