@@ -1,9 +1,62 @@
 # Copyright (c) 2013 Chananya Freiman (aka GhostWolf)
 
+def preprocess_defines(defines)
+  rewrites = {}
+  
+  # Get inline values for simple number equation #defines
+  # E.g.: 5 => 5, 5*2 => 10
+  defines.each { |v|
+    begin
+      n = eval(v[2]).to_s()
+      rewrites[v[1]] = n
+      v[3] = n
+    rescue
+    end
+  }
+  
+  # Get inline values for #define equations that have the previously inlined #defines in their values
+  # E.g.: N/2 => 5/2 => 2.5, assuming N was inlined as 5
+  defines.each { |v|
+    if not v[3]
+      begin
+        s = v[2]
+        rewrites.each { |k, n|
+          s.gsub!(/\b#{k}\b/, n)
+        }
+        
+        n = eval(s).to_s()
+        v[3] = n
+      rescue
+      end
+    end
+  }
+end
+
+def inline_defines(defines, data)
+  # First pass removes the inlined #define lines
+  defines.each { |v|
+    if v[3]
+      data.sub!(v[0], "")
+    end
+  }
+  
+  # Second pass inlines the values
+  defines.each { |v|
+    if v[3]
+      data.gsub!(/\b#{v[1]}\b/, v[3])
+    end
+  }
+end
+
 def rewrite_numbers(data)
   # Convert hexadecimal numbers to decimal numbers
   data.gsub!(/0x[0-9a-fA-F]+/) { |n|
     n.to_i(16)
+  }
+  
+  # Remove useless zeroes
+  data.gsub!(/\b\d*\.?\d+\b/) { |n|
+    n.to_f().to_s()
   }
   
   # Remove useless zeroes
@@ -139,6 +192,8 @@ def remove_whitespace(oldsource)
   need_newline = false
   source = ""
   
+  oldsource = oldsource.sub(/^\n+/, "")
+  
   oldsource.each_line { |line|
     line = line.strip().gsub(/\s{2,}|\t/, " ")
     
@@ -156,6 +211,59 @@ def remove_whitespace(oldsource)
   }
   
   return source.gsub(/\n+/, "\n").gsub("\n", "\\n")
+end
+
+def get_used_functions_in_function(used_functions, main_function, function_chunks)
+  function_chunks.each { |f|
+    match = main_function[2][/\b#{f[0]}\b/]
+    
+    if match
+      used_functions[match] = 1
+      
+      get_used_functions_in_function(used_functions, function_chunks[match], function_chunks)
+    end
+  }
+end
+
+# Removes dead functions
+def remove_dead_functions(shaders, datatypes)
+  functions = []
+  used_functions = {"main" => 1}
+  function_chunks = {}
+  main_chunks = []
+  shaders.each { |shader|
+    parse_functions(shader, datatypes).each_with_index { |chunk, i|
+      if i % 2 != 0
+        name = chunk[0].split(/\s+/)[1]
+      
+        if name != "main"
+          function_chunks[name] = chunk
+        else
+          main_chunks.push(chunk)
+        end
+      end
+    }
+  }
+  
+  main_chunks.each { |main_function|
+    get_used_functions_in_function(used_functions, main_function, function_chunks)
+  }
+  
+  shaders.map! { |shader|
+    source = ""
+    
+    parse_functions(shader, datatypes).each_with_index { |chunk, i|
+      if i % 2 != 0
+        if used_functions[chunk[0].split(/\s+/)[1]]
+          source += chunk.join("")
+        end
+      else
+        source += chunk.join("")
+      end
+    }
+    
+    source
+  }
 end
 
 # Renames function arguments and local variables of all functions
@@ -178,8 +286,8 @@ end
 
 # Gets all the defines and their values
 def get_defines(data)
-  data.scan(/#define\s+(\w+)\s+([^\n]+)/).map { |match|
-    [match[0], match[1].strip()]
+  data.scan(/(#define\s+(\w+)\s+([^\n]+))/).map { |match|
+    [match[0], match[1], match[2].strip()]
   }
 end
 
@@ -188,26 +296,16 @@ def get_function_names(data, datatypes)
   data.scan(/(?:#{datatypes})\s+(\w+)\s*\(/)
 end
 
-# Gets the names of all uniforms
-def get_uniform_names(data, datatypes)
-  data.scan(/uniform\s+(?:#{datatypes})\s+(\w+)/)
-end
-
-# Gets the names of all attributes
-def get_attribute_names(data, datatypes)
-  data.scan(/attribute\s+(?:#{datatypes})\s+(\w+)/)
-end
-
-# Gets the names of all varyings
-def get_varying_names(data, datatypes)
-  data.scan(/varying\s+(?:#{datatypes})\s+(\w+)/)
+# Gets the names of all variables with the given qualifier
+def get_variable_names(data, qualifier, datatypes)
+  data.scan(/#{qualifier}\s+(?:#{datatypes})\s+(\w+)\s*;/)
 end
 
 # Generate a old name to new name mapping and sort the names alphabetically
 def gen_map(data, names, rewrite)
   # Select new short names for all the functions
   map = data.uniq().map { |v|
-    if rewrite
+    if rewrite and v[0] != "main"
       [v[0], names.shift()]
     else
       [v[0], v[0]]
@@ -254,20 +352,27 @@ def rewrite_map(map, data)
   }
 end
 
-def group_list(list, keyword)
+def group_list(list)
+  #p list
   map = {}
   data = ""
   
   list.each { |v|
     if not map[v[0]]
-      map[v[0]] = []
+      map[v[0]] = {}
     end
     
-    map[v[0]].push(v[1])
+    if not map[v[0]][v[1]]
+      map[v[0]][v[1]] = []
+    end
+    
+    map[v[0]][v[1]].push([v[2], v[3]])
   }
   
-  map.each { |v|
-    data += "#{keyword} #{v[0]} #{v[1].join(",")};\n"
+  map.each { |qualifier, v|
+    v.each { |datatype, v|
+      data += "#{qualifier} #{datatype} #{v.collect { |v| "#{v[0]}#{v[1]}"}.join(",")};"
+    }
   }
   
   return data
@@ -276,35 +381,22 @@ end
 def group_globals(data, datatypes)
   source = ""
   
+  # All global variables in global scope can be combined, unless they exist in #ifdefs
   outer = data.gsub(/(#if.*?#endif)/m, "")
   
-  source += group_list(outer.scan(/uniform\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/), "uniform")
-  source += group_list(outer.scan(/attribute\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/), "attribute")
-  source += group_list(outer.scan(/varying\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/), "varying")
+  source += group_list(outer.scan(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/))
   
   data.split(/(#if.*?#endif)/m).each { |chunk|
-    if chunk.start_with?("#")
+    if chunk.start_with?("#if")
       tokens = chunk.split(/(.*?\n)(.*?)(#endif)/m)
       
       source += tokens[1]
-      
-      source += group_list(tokens[2].scan(/uniform\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/), "uniform")
-      source += group_list(tokens[2].scan(/attribute\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/), "attribute")
-      source += group_list(tokens[2].scan(/varying\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/), "varying")
-        
-      tokens[2].gsub!(/uniform\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/, "")
-      tokens[2].gsub!(/attribute\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/, "")
-      tokens[2].gsub!(/varying\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/, "")
-  
-      source += tokens[2]
+      source += group_list(tokens[2].scan(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/))
+      source += tokens[2].gsub(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/, "")
       source += tokens[3]
       source += "\n"
     else
-      chunk.gsub!(/uniform\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/, "")
-      chunk.gsub!(/attribute\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/, "")
-      chunk.gsub!(/varying\s+(#{datatypes})\s+(\w+(\[\s*\d+\s*\])?)\s*;/, "")
-      
-      source += chunk
+      source += chunk.gsub(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/, "")
     end
   }
   
@@ -322,6 +414,7 @@ def minify(paths, rewriteall)
   uniforms = []
   attributes = []
   varyings = []
+  constants = [];
   members = [];
   
   # Remove comments
@@ -337,12 +430,16 @@ def minify(paths, rewriteall)
   # Create a regex of all the known data types
   datatypes_string = datatypes.concat(user_datatypes).join("|")
   
+  # Remove dead functions that are not in the call graph of the main() function in any of the inputs
+  remove_dead_functions(shaders, datatypes_string)
+  
   # Get all function/uniform/attribute/varying names, and define names and their values
   shaders.each { |shader|
     functions += get_function_names(shader, datatypes_string)
-    uniforms += get_uniform_names(shader, datatypes_string)
-    attributes += get_attribute_names(shader, datatypes_string)
-    varyings += get_varying_names(shader, datatypes_string)
+    uniforms += get_variable_names(shader, "uniform", datatypes_string)
+    attributes += get_variable_names(shader, "attribute", datatypes_string)
+    varyings += get_variable_names(shader, "varying", datatypes_string)
+    constants += get_variable_names(shader, "const", datatypes_string)
     defines += get_defines(shader)
     members += get_member_names(shader, datatypes_string);
   }
@@ -352,16 +449,21 @@ def minify(paths, rewriteall)
   uniform_map = gen_map(uniforms, names, rewriteall)
   attribute_map = gen_map(attributes, names, rewriteall)
   varyings_map = gen_map(varyings, names, true)
+  constants_map = gen_map(constants, names, true)
   member_map = gen_map_map(members, [*("a".."z"), *("A".."Z"), *("aa".."zz")], true)
   
+  # Preprocess #defines to prepare them for inlining
+  preprocess_defines(defines)
+  
   shaders.map! { |shader|
+    # Inline #defines
+    inline_defines(defines, shader)
+    
     shader = group_globals(shader, datatypes_string)
     
     # Rewrite function names
     function_map.each { |function|
-      if function[0] != "main"
-        shader.gsub!(/\b#{function[0]}\b/, function[1])
-      end
+      shader.gsub!(/\b#{function[0]}\b/, function[1])
     }
     
     # Rename function arguments and local variables
@@ -381,16 +483,11 @@ def minify(paths, rewriteall)
     # Rewrite varying names
     rewrite_map(varyings_map, shader)
     
+    # Rewrite varying names
+    rewrite_map(constants_map, shader)
+    
     # Rewrite struct member names
     shader = rename_members(shader, member_map, datatypes_string)
-    
-    # Remove the define lines from the source
-    shader.gsub!(/#define\s+(\w+)\s+([^\n]+)/, "")
-    
-    # Inline defines
-    defines.each { |define|
-      shader.gsub!(/\b#{define[0]}\b/, define[1])
-    }
     
     # Remove whitespace
     shader = remove_whitespace(shader)
