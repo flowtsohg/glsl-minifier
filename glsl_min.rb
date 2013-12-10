@@ -56,7 +56,11 @@ def rewrite_numbers(data)
   
   # Remove useless zeroes
   data.gsub!(/\b\d*\.?\d+\b/) { |n|
-    n.to_f().to_s()
+    if n["."]
+      n.to_f().to_s()
+    else
+      n.to_i().to_s()
+    end
   }
   
   # Remove useless zeroes
@@ -387,6 +391,7 @@ def group_globals(data, datatypes)
   source += group_list(outer.scan(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/))
   
   data.split(/(#if.*?#endif)/m).each { |chunk|
+    # Do the same thing inside #ifdefs
     if chunk.start_with?("#if")
       tokens = chunk.split(/(.*?\n)(.*?)(#endif)/m)
       
