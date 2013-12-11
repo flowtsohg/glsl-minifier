@@ -11,11 +11,21 @@ Features:
 * Renames structs/functions/function arguments/function local variables/varying variable/const variables.
 * Optionally renames uniform variables, attribute variables, and struct members (read on to see how to access them).
 * Removes useless zeroes from numbers, converts hexadecimal numbers to decimal numbers, and changes decimal numbers to exponent representation if it's shorter.  
-`0.10 => .1`  
-`1.0 => 1.`  
-`0x1 => 1`  
-`1000 => 1e3`
 
+```
+0.10;
+1.0;
+0x1;
+1000;
+```
+Becomes:  
+
+```
+.1;
+1.;
+1;
+1e3;
+```
 * Inlines #defines.  
 
 ```
@@ -23,7 +33,7 @@ Features:
 #define SECOND FIRST*2
 FIRST;SECOND;
 ```
-Becomes:
+Becomes:  
 `5;10;`
 * Merges uniform/attribute/varying/const declarations to list declarations where possible.  
 
@@ -36,7 +46,7 @@ attribute float d;
 attribute float e;
 #endif
 ```
-Becomes:
+Becomes:  
 ```
 uniform vec3 a,b,c;
 #ifdef COND
@@ -95,7 +105,7 @@ The second argument is a boolean, and controls whether uniforms/attribute/struct
 
 The function returns an array with three indices:
 
-Index 0 is another array - the new shader sources for all inputs.  
+Index 0 is an array of source outputs.  
 Index 1 is a hash object that maps between uniform/attribute old/new names.  
 Index 2 is a hash object that maps between struct member's old/new names.  
 
