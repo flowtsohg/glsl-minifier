@@ -579,13 +579,3 @@ def minify(paths, rewriteall)
   
   return [shaders, uniform_map.concat(attribute_map), member_map]
 end
-
-minified = minify(["pscommon.c", "psstandard.c"], true)
-
-File.open("test.c", "w") { |output|
-  minified[0].each_with_index { |data, i|
-    output.write("// input #{i}\n")
-    output.write(data)
-    output.write("\n")
-  }
-}
