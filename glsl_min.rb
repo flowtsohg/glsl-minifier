@@ -1,5 +1,40 @@
 # Copyright (c) 2013 Chananya Freiman (aka GhostWolf)
 
+# Used to generate all the permutations of vector fields of length 2-4 (xyzw, rgba, stpq)
+# E.g., xx xy xz xw yx yy yz yw ...
+def permutations(v)
+  perms = []
+  
+  (2..4).each { |k|
+    perms += v.repeated_permutation(k).to_a().map! { |v| v.join("") }
+  }
+  
+  return perms
+end
+
+# Rename language keywords and types using #defines where it will reduce the overall size
+def add_defines(data, language_words)
+  defines = []
+  
+  language_words.each { |v|
+    uses = data.scan(/\b#{v[0]}\b/).length
+    usage = uses * v[0].length
+    
+    if usage > 0
+      define = "#define #{v[1]} #{v[0]}\n"
+      define_usage = define.length + uses * v[1].length
+      
+      if define_usage < usage
+        defines.push("#define #{v[1]} #{v[0]}")
+        
+        data.gsub!(/\b#{v[0]}\b/, v[1])
+      end
+    end
+  }
+  
+  return "\n" + defines.join("\n") + "\n" + data
+end
+
 def preprocess_defines(defines)
   rewrites = {}
   
@@ -101,9 +136,38 @@ def rename_members(data, map, datatypes)
   source = ""
   
   parse_structs(data, datatypes).each_with_index { |chunk, i|
-    rename_struct_members(chunk, map, datatypes) if i % 2 != 0
-    
-    source += chunk
+    if i % 2 != 0
+      # Rename the members
+      rename_struct_members(chunk, map, datatypes)
+      
+      tokens = chunk.split(/(struct \w+{)(.*?)(};)/m)
+      
+      source += tokens[1]
+      
+      # All global variables in global scope can be combined, unless they exist in #ifdefs
+      outer = tokens[2].gsub(/(#if.*?#endif)/m, "")
+      
+      source += group_list(outer.scan(/()(#{datatypes})\s+(\w+)(.*?);/))
+      
+      tokens[2].split(/(#ifdef.*?#endif)/m).each { |chunk|
+        # Do the same thing inside #ifdefs
+        if chunk.start_with?("#if")
+          tokens = chunk.split(/(#ifdef.*?\n)(.*?)(#endif)/m)
+          
+          source += tokens[1]
+          source += group_list(tokens[2].scan(/()(#{datatypes})\s+(\w+)(.*?);/))
+          source += tokens[2].gsub(/(#{datatypes})\s+(\w+)(.*?);/, "")
+          source += tokens[3]
+          source += "\n"
+        else
+          source += chunk.gsub(/(#{datatypes})\s+(\w+)(.*?);/, "")
+        end
+      }
+      
+      source += "};"
+    else
+      source += chunk
+    end
   }
   
   map.each { |v|
@@ -214,7 +278,7 @@ def remove_whitespace(oldsource)
     end
   }
   
-  return source.gsub(/\n+/, "\n").gsub("\n", "\\n")
+  return source.gsub(/\n+/, "\n")
 end
 
 def get_used_functions_in_function(used_functions, main_function, function_chunks)
@@ -357,7 +421,6 @@ def rewrite_map(map, data)
 end
 
 def group_list(list)
-  #p list
   map = {}
   data = ""
   
@@ -388,20 +451,24 @@ def group_globals(data, datatypes)
   # All global variables in global scope can be combined, unless they exist in #ifdefs
   outer = data.gsub(/(#if.*?#endif)/m, "")
   
-  source += group_list(outer.scan(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/))
+  source += group_list(outer.scan(/(uniform|attribute|varying|const) (#{datatypes}) (\w+)(.*?);/))
   
   data.split(/(#if.*?#endif)/m).each { |chunk|
     # Do the same thing inside #ifdefs
-    if chunk.start_with?("#if")
-      tokens = chunk.split(/(.*?\n)(.*?)(#endif)/m)
-      
-      source += tokens[1]
-      source += group_list(tokens[2].scan(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/))
-      source += tokens[2].gsub(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/, "")
-      source += tokens[3]
-      source += "\n"
+    if chunk[/uniform|attribute|varying|const/]
+      if chunk.start_with?("#if")
+        tokens = chunk.split(/(.*?\n)(.*?)(#endif)/m)
+        
+        source += tokens[1]
+        source += group_list(tokens[2].scan(/(uniform|attribute|varying|const) (#{datatypes}) (\w+)(.*?);/))
+        source += tokens[2].gsub(/(uniform|attribute|varying|const) (#{datatypes}) (\w+)(.*?);/, "")
+        source += tokens[3]
+        source += "\n"
+      else
+        source += chunk.gsub(/(uniform|attribute|varying|const) (#{datatypes}) (\w+)(.*?);/, "")
+      end
     else
-      source += chunk.gsub(/(uniform|attribute|varying|const)\s+(#{datatypes})\s+(\w+)(.*?);/, "")
+      source += chunk
     end
   }
   
@@ -411,9 +478,11 @@ end
 # Minify shaders given in an array
 def minify(paths, rewriteall)
   shaders = paths.map { |path| IO.read(path) }
-  names = [*("A".."Z"), *("AA".."ZZ")]
+  names = [*("A".."Z"), *("AA".."ZZ"), *("aA".."zZ"), *("Aa".."Zz"), *("Aa".."ZZ"), *("A0".."Z9")]
   datatypes = ["void", "bool", "u?int", "float", "double", "(?:b|i|u|d)?vec[2-4]", "mat[2-4](?:x[2-4])?", "sampler[1-3]D", "samplerCube(?:Array)?", "sampler2DRect", "sampler[1-2]DArray", "samplerBuffer", "sampler2DMS(?:Array)?", "sampler[1-2]DShadow", "samplerCubeShadow", "sampler2DRectShadow", "sampler[1-2]DArrayShadow", "samplerCubeArrayShadow", "image[1-3]D", "imageCube(?:Array)?", "image2DRect", "image[1-2]DArray", "imageBuffer", "image2DMS(?:Array)?"]
-  user_datatypes = []
+  vec_permutations = permutations(["x", "y", "z", "w"]) + permutations(["r", "g", "b", "a"]) + permutations(["s", "t", "p", "q"])
+  language_words = ["attribute","const","uniform","varying","buffer","shared","coherent","volatile","restrict","readonly","writeonly","atomic_uint","layout","centroid","flat","smooth","noperspective","patch","sample","break","continue","do","for","while","switch","case","default","if","else","subroutine","in","out","inout","float","double","int","void","bool","true","false","invariant","discard","return","mat2","mat3","mat4","dmat2","dmat3","dmat4","mat2x2","mat2x3","mat2x4","dmat2x2","dmat2x3","dmat2x4","mat3x2","mat3x3","mat3x4","dmat3x2","dmat3x3","dmat3x4","mat4x2","mat4x3","mat4x4","dmat4x2","dmat4x3","dmat4x4","vec2","vec3","vec4","ivec2","ivec3","ivec4","bvec2","bvec3","bvec4","dvec2","dvec3","dvec4","uint","uvec2","uvec3","uvec4","lowp","mediump","highp","precision","sampler1D","sampler2D","sampler3D","samplerCube","sampler1DShadow","sampler2DShadow","samplerCubeShadow","sampler1DArray","sampler2DArray","sampler1DArrayShadow","sampler2DArrayShadow","isampler1D","isampler2D","isampler3D","isamplerCube","isampler1DArray","isampler2DArray","usampler1D","usampler2D","usampler3D","u","samplerCube","usampler1DArray","usampler2DArray","sampler2DRect","sampler2DRectShadow","isampler2DRect","usampler2DRect","samplerBuffer","isamplerBuffer","usamplerBuffer","sampler2DMS","isampler2DMS","usampler2DMS","sampler2DMSArray","isampler2DMSArray","usampler2DMSArray","samplerCubeArray","samplerCubeArrayShadow","isamplerCubeArray","usamplerCubeArray","image1D","iimage1D","uimage1D","image2D","iimage2D","uimage2D","image3D","iimage3D","uimage3D","image2DRect","iimage2DRect","uimage2DRect","imageCube","iimageCube","uimageCube","imageBuffer","iimageBuffer","uimageBuffer","image1DArray","iimage1DArray","uimage1DArray","image2DArray","iimage2DArray","uimage2DArray","imageCubeArray","iimageCubeArray","uimageCubeArray","image2DMS","iimage2DMS","uimage2DMS","image2DMSArray","iimage2DMSArray","uimage2DMSArray","struct","gl_VertexID","gl_InstanceID","gl_PerVertex","gl_Position","gl_PointSize","gl_ClipDistance","gl_PatchVerticesIn","gl_PrimitiveID","gl_InvocationID","gl_TessLevelOuter","gl_TessLevelInner","gl_TessCoord","gl_PrimitiveIDIn","gl_Layer","gl_ViewportIndex","gl_FragCoord","gl_FrontFacing","gl_PointCoord","gl_SampleID","gl_SamplePosition","gl_SampleMaskIn","gl_FragDepth","gl_SampleMask","gl_NumWorkGroups","gl_WorkGroupSize","gl_LocalGroupSize","gl_WorkGroupID","gl_LocalInvocationID","gl_GlobalInvocationID","gl_LocalInvocationIndex","gl_MaxComputeWorkGroupCount","gl_MaxComputeWorkGroupSize","gl_MaxComputeUniformComponents","gl_MaxComputeTextureImageUnits","gl_MaxComputeImageUniforms","gl_MaxComputeAtomicCounters","gl_MaxComputeAtomicCounterBuffers","gl_MaxVertexAttribs","gl_MaxVertexUniformComponents","gl_MaxVaryingComponents","gl_MaxVertexOutputComponents","gl_MaxGeometryInputComponents","gl_MaxGeometryOutputComponents","gl_MaxFragmentInputComponents","gl_MaxVertexTextureImageUnits","gl_MaxCombinedTextureImageUnits","gl_MaxTextureImageUnits","gl_MaxImageUnits","gl_MaxCombinedImageUnitsAndFragmentOutputs","gl_MaxImageSamples","gl_MaxVertexImageUniforms","gl_MaxTessControlImageUniforms","gl_MaxTessEvaluationImageUniforms","gl_MaxGeometryImageUniforms","gl_MaxFragmentImageUniforms","gl_MaxCombinedImageUniforms","gl_MaxFragmentUniformComponents","gl_MaxDrawBuffers","gl_MaxClipDistances","gl_MaxGeometryTextureImageUnits","gl_MaxGeometryOutputVertices","gl_MaxGeometryTotalOutputComponents","gl_MaxGeometryUniformComponents","gl_MaxGeometryVaryingComponents","gl_MaxTessControlInputComponents","gl_MaxTessControlOutputComponents","gl_MaxTessControlTextureImageUnits","gl_MaxTessControlUniformComponents","gl_MaxTessControlTotalOutputComponents","gl_MaxTessEvaluationInputComponents","gl_MaxTessEvaluationOutputComponents","gl_MaxTessEvaluationTextureImageUnits","gl_MaxTessEvaluationUniformComponents","gl_MaxTessPatchComponents","gl_MaxPatchVertices","gl_MaxTessGenLevel","gl_MaxViewports","gl_MaxVertexUniformVectors","gl_MaxFragmentUniformVectors","gl_MaxVaryingVectors","gl_MaxVertexAtomicCounters","gl_MaxTessControlAtomicCounters","gl_MaxTessEvaluationAtomicCounters","gl_MaxGeometryAtomicCounters","gl_MaxFragmentAtomicCounters","gl_MaxCombinedAtomicCounters","gl_MaxAtomicCounterBindings","gl_MaxVertexAtomicCounterBuffers","gl_MaxTessControlAtomicCounterBuffers","gl_MaxTessEvaluationAtomicCounterBuffers","gl_MaxGeometryAtomicCounterBuffers","gl_MaxFragmentAtomicCounterBuffers","gl_MaxCombinedAtomicCounterBuffers","gl_MaxAtomicCounterBufferSize","gl_MinProgramTexelOffset","gl_MaxProgramTexelOffset","gl_MaxTransformFeedbackBuffers","gl_MaxTransformFeedbackInterleavedComponents","radians","degrees","sin","cos","tan","asin","acos","atan","sinh","cosh","tanh","asinh","acosh","atanh","pow","exp","log","exp2","log2","sqrt","inversesqrt","abs","sign","floor","trunc","round","roundEven","ceil","fract","mod","modf","min","max","clamp","mix","step","smoothstep","isnan","isinf","floatBitsToInt","floatBitsToUint","intBitsToFloat","uintBitsToFloat","fma","frexp","ldexp","packUnorm2x16","packSnorm2x16","packUnorm4x8","packSnorm4x8","unpackUnorm2x16","unpackSnorm2x16","unpackUnorm4x8","unpackSnorm4x8","packDouble2x32","unpackDouble2x32","packHalf2x16","unpackHalf2x16","length","distance","dot","cross","normalize","faceforward","reflect","refract","matrixCompMult","outerProduct","transpose","determinant","inverse","lessThan","lessThanEqual","greaterThan","greaterThanEqual","equal","notEqual","any","all","not","uaddCarry","usubBorrow","umulExtended","imulExtended","bitfieldExtract","bitfieldReverse","bitfieldInsert","bitCount","findLSB","findMSB","atomicCounterIncrement","atomicCounterDecrement","atomicCounter","atomicOP","imageSize","imageLoad","imageStore","imageAtomicAdd","imageAtomicMin","imageAtomicMax","imageAtomicAnd","mageAtomicOr","imageAtomicXor","imageAtomicExchange","imageAtomicCompSwap","dFdx","dFdy","fwidth","interpolateAtCentroid","interpolateAtSample","interpolateAtOffset","noise1","noise2","noise3","noise4","EmitStreamVertex","EndStreamPrimitive","EmitVertex","EndPrimitive","barrier","memoryBarrier","groupMemoryBarrier","memoryBarrierAtomicCounter","memoryBarrierShared","memoryBarrierBuffer","memoryBarrierImage","textureSize","textureQueryLod","textureQueryLevels","texture","textureProj","textureLod","tureOffset","texelFetch","texelFetchOffset","textureProjOffset","textureLodOffset","textureProjLod","textureProjLodOffset","textureGrad","textureGradOffset","textureProjGrad","textureProjGradOffset","textureGather","textureGatherOffset","textureGatherOffsets","texture2D","texture2DProj","texture2DLod","texture2DProjLod","textureCube","textureCubeLod"] + vec_permutations
+  structs = []
   defines = []
   functions = []
   uniforms = []
@@ -422,18 +491,18 @@ def minify(paths, rewriteall)
   constants = [];
   members = [];
   
-  # Remove comments
-  shaders.each { |shader|
+  shaders.map! { |shader|
     remove_comments(shader)
+    remove_whitespace(shader)
   }
   
-  # Get struct names and define names and their values
+  # Get struct names
   shaders.each { |shader|
-    user_datatypes += get_struct_names(shader)
+    structs += get_struct_names(shader)
   }
   
   # Create a regex of all the known data types
-  datatypes_string = datatypes.concat(user_datatypes).join("|")
+  datatypes_string = datatypes.concat(structs).join("|")
   
   # Remove dead functions that are not in the call graph of the main() function in any of the inputs
   remove_dead_functions(shaders, datatypes_string)
@@ -450,12 +519,16 @@ def minify(paths, rewriteall)
   }
   
   function_map = gen_map(functions, names, true)
-  user_data_type_map = gen_map(user_datatypes, names, true)
+  struct_map = gen_map(structs, names, true)
   uniform_map = gen_map(uniforms, names, rewriteall)
   attribute_map = gen_map(attributes, names, rewriteall)
   varyings_map = gen_map(varyings, names, true)
   constants_map = gen_map(constants, names, true)
   member_map = gen_map_map(members, [*("a".."z"), *("A".."Z"), *("aa".."zz")], true)
+  
+  language_words = language_words.uniq().map { |v|
+    [v, names.shift()]
+  }
   
   # Preprocess #defines to prepare them for inlining
   preprocess_defines(defines)
@@ -475,8 +548,8 @@ def minify(paths, rewriteall)
     shader = rename_locals(shader, datatypes_string)
     
     # Rewrite user defined type names
-    user_data_type_map.each { |data_type|
-      shader.gsub!(/\b#{data_type[0]}\b/, data_type[1])
+    struct_map.each { |struct|
+      shader.gsub!(/\b#{struct[0]}\b/, struct[1])
     }
     
     # Rewrite uniform names
@@ -494,14 +567,25 @@ def minify(paths, rewriteall)
     # Rewrite struct member names
     shader = rename_members(shader, member_map, datatypes_string)
     
-    # Remove whitespace
-    shader = remove_whitespace(shader)
-    
     # Rewrite numbers
     rewrite_numbers(shader)
     
-    shader
+    shader = add_defines(shader, language_words)
+    
+    # Add a new line at the beginning to make shader concatenation safe at run-time when using the shaders
+    # Otherwise, if the first line of a shader is a pre-processor directive, it will cause an error when concatenating it
+    "\\n" + remove_whitespace(shader).gsub("\n", "\\n")
   }
   
   return [shaders, uniform_map.concat(attribute_map), member_map]
 end
+
+minified = minify(["pscommon.c", "psstandard.c"], true)
+
+File.open("test.c", "w") { |output|
+  minified[0].each_with_index { |data, i|
+    output.write("// input #{i}\n")
+    output.write(data)
+    output.write("\n")
+  }
+}
