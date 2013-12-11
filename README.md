@@ -20,15 +20,28 @@ Features:
 
 ```
 #define FIRST 5
-#define SECOND FIRST*2  =>  5;10;
+#define SECOND FIRST*2
 FIRST;SECOND;
 ```
+Becomes:
+`5;10;`
 * Merges uniform/attribute/varying/const declarations to list declarations where possible.  
 
 ```
 uniform vec3 a;
-uniform vec3 b;  =>  uniform vec3 a,b,c;
+uniform vec3 b;
 uniform vec3 c;
+#ifdef COND
+attribute float d;
+attribute float e;
+#endif
+```
+Becomes:
+```
+uniform vec3 a,b,c;
+#ifdef COND
+attribute float d,e;
+#endif
 ```
 * Removes dead functions.
 
@@ -50,7 +63,22 @@ void main() {
   Alive1();
 }
 ```
+* Replaces language keywords, functions, and vector fiels with #defines in cases where it will minify the source.
 
+```
+float;float;float;float;float;float;
+.rgba;.rgba;.rgba;.rgba;.rgba;.rgba;
+uniform;
+```
+Becomes:
+
+```
+#define A float
+#define B rgba
+A;A;A;A;A;A;
+.B;.B;.B;.B;.B;
+uniform // Only one use, #define will take more space, so not replaced
+```
 
 ---------------------------------------
 
