@@ -140,7 +140,7 @@ So to set the 'something' member of this uniform, we must use the returned maps:
 
 
 ---------------------------------------
-Finally, for proof of concept, here's the output from an actual (quite big 451 liner) shader.
+Finally, for proof of concept, here's the output from an actual (quite big 451 liner) shader, created from 4 distinct files.
   
 Vertex shader:
 * File 1
