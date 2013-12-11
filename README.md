@@ -97,11 +97,20 @@ All the features work on a list of files in order to make the same changes on al
 That is, the same new names will be given across all inputs, dead functions are functions that can't be reached from a main() function from any of the inputs, and so on.
 This is useful for when there is shared code between shaders that is kept separately.
 
+The exception to this is creating #defines for keywords.
+These defines will always share the same name, but might be created multiple times, since they are on a per-file basis.
+For example, if the keyword "else" should be replaced in two distinct files, both will have the following line (assuming the name it got is A of course):  
+`#define A else`  
+This doesn't affect concatenation, since redefining #defines is valid in GLSL.
+
 ---------------------------------------
 
 #### Usage
-  `minify_sources(["source1", "source2", ...], rewriteall)`
-  `minify_files(["file1", "file2", ...], rewriteall)`
+
+```
+minify_sources(["source1", "source2", ...], rewriteall)
+minify_files(["file1", "file2", ...], rewriteall)
+```
 
 The second argument is a boolean, and controls whether uniforms/attribute/struct members will get renamed.
 
