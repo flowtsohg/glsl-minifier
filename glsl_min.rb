@@ -572,9 +572,14 @@ def minify(paths, rewriteall)
     
     shader = add_defines(shader, language_words)
     
-    # Add a new line at the beginning to make shader concatenation safe at run-time when using the shaders
-    # Otherwise, if the first line of a shader is a pre-processor directive, it will cause an error when concatenating it
-    "\\n" + remove_whitespace(shader).gsub("\n", "\\n")
+    shader = remove_whitespace(shader).gsub("\n", "\\n")
+    
+    # If the first line of a shader is a pre-processor directive, it will cause an error when concatenating it, so add a new line
+    if shader[0] = "#"
+      shader = "\\n" + shader
+    end
+    
+    shader
   }
   
   return [shaders, uniform_map.concat(attribute_map), member_map]
