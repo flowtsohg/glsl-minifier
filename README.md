@@ -74,7 +74,7 @@ void main() {
   Alive1();
 }
 ```
-* Replaces language keywords, functions, and vector fiels with #defines in cases where it will minify the source.
+* Replaces language keywords, functions, and vector sizzles with #defines in cases where it will minify the source.
 
 ```
 float;float;float;float;float;float;
