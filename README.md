@@ -83,7 +83,7 @@ uniform // Only one use, #define will take more space, so not replaced
 ---------------------------------------
 
 All the features work on a list of files in order to make the same changes on all of them and keep them working.
-That is, the same new names will be given across all inputs, dead functions will only be functions that can't be reach from a main() function from any of the inputs, and so on.
+That is, the same new names will be given across all inputs, dead functions are functions that can't be reached from a main() function from any of the inputs, and so on.
 This is useful for when there is shared code between shaders that is kept separately.
 
 ---------------------------------------
