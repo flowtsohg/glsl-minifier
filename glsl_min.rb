@@ -575,7 +575,7 @@ def minify(paths, rewriteall)
     shader = remove_whitespace(shader).gsub("\n", "\\n")
     
     # If the first line of a shader is a pre-processor directive, it will cause an error when concatenating it, so add a new line
-    if shader[0] = "#"
+    if shader[0] == "#"
       shader = "\\n" + shader
     end
     
