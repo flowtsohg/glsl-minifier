@@ -6,7 +6,8 @@ A GLSL minifier.
 
 ---------------------------------------
 
-Features:
+#### Features
+
 * Removes unneeded whitespace.
 * Renames structs/functions/function arguments/function local variables/varying variable/const variables.
 * Optionally renames uniform variables, attribute variables, and struct members (read on to see how to access them).
@@ -98,8 +99,9 @@ This is useful for when there is shared code between shaders that is kept separa
 
 ---------------------------------------
 
-Usage:
-  `minify(["file1", "file2", ...], rewriteall)`
+#### Usage
+  `minify_sources(["source1", "source2", ...], rewriteall)`
+  `minify_files(["file1", "file2", ...], rewriteall)`
 
 The second argument is a boolean, and controls whether uniforms/attribute/struct members will get renamed.
 
