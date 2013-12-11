@@ -476,8 +476,7 @@ def group_globals(data, datatypes)
 end
 
 # Minify shaders given in an array
-def minify(paths, rewriteall)
-  shaders = paths.map { |path| IO.read(path) }
+def minify_sources(shaders, rewriteall)
   names = [*("A".."Z"), *("AA".."ZZ"), *("aA".."zZ"), *("Aa".."Zz"), *("Aa".."ZZ"), *("A0".."Z9")]
   datatypes = ["float","double","u?int","void","bool","d?mat[2-4](?:x[2-4])?","[ibdu]?vec[2-4]","[iu]?(?:sampler|image)(?:[1-3]D|Cube|Buffer)(?:MSArray|MS|RectShadow|Rect|ArrayShadow|Shadow|Array)?"]
   sizzle_permutations = permutations(["x", "y", "z", "w"]) + permutations(["r", "g", "b", "a"]) + permutations(["s", "t", "p", "q"])
@@ -583,4 +582,8 @@ def minify(paths, rewriteall)
   }
   
   return [shaders, uniform_map.concat(attribute_map), member_map]
+end
+
+def minify_files(paths, rewriteall)
+  minify_sources(paths.map { |path| IO.read(path) }, rewriteall)
 end
