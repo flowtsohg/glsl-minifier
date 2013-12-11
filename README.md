@@ -133,7 +133,7 @@ struct A {
 uniform A B;
 ```
 The array returned by this minify call will be the following:  
-`minified = ["struct A{float a;};uniform A B;", {"Foo"=>"A", "foo"=>"B"}, {"something"=>"a"}]`
+`minified = [["struct A{float a;};uniform A B;"], {"Foo"=>"A", "foo"=>"B"}, {"something"=>"a"}]`
 
 So to set the 'something' member of this uniform, we must use the returned maps:
 `minified[1]["foo"] + "." + minified[2]["something"]` => `B.a`
