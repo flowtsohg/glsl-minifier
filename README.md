@@ -42,17 +42,28 @@ Becomes:
 uniform vec3 a;
 uniform vec3 b;
 uniform vec3 c;
+
 #ifdef COND
 attribute float d;
 attribute float e;
 #endif
+
+struct Foo {
+  float a;
+  float b;
+};
 ```
 Becomes:  
 ```
 uniform vec3 a,b,c;
+
 #ifdef COND
 attribute float d,e;
 #endif
+
+struct Foo {
+  float a,b;
+}
 ```
 * Removes dead functions.
 
