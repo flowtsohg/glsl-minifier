@@ -166,12 +166,13 @@ minified = [["struct A{float a;};uniform A B;"], {"Foo"=>"A", "foo"=>"B"}, {"som
 
 So to set the 'something' member of this uniform, we must use the returned maps:
 ```ruby
-minified[1]["foo"] + "." + minified[2]["something"] => `B.a`
+minified[1]["foo"] + "." + minified[2]["something"]
 ```
 
+Which is equivalent to `B.a`.
 
 ---------------------------------------
-Finally, for proof of concept, here's the output from an actual (quite big 451 liner) shader, created from 4 distinct files.
+Finally, for an example, here's the output from an actual (quite big 451 lines) shader, created from 4 distinct files.
   
 Vertex shader:
 * File 1
